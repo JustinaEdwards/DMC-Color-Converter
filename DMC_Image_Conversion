@@ -1,0 +1,24 @@
+from PIL import Image
+from numpy import asarray
+
+image_original=Image.open("Pictures/Skull_And_Roses.png").convert('RGB')
+
+image_resize_height=100
+image_resize_width=100
+
+image_original.thumbnail((image_resize_height,image_resize_width))
+
+#Converts original image into NumPy array; array format(h,h,(rgb))
+original_pixel_array=asarray(image_original)
+
+#Extract the image height, width, and RGB values into variables
+image_height_arr,image_width_arr,image_rgb_arr=original_pixel_array.shape
+
+#Formats the NumPy array into a 2D array in order to reduce the number of colors in the image
+original_image_2d_arr=original_pixel_array.reshape(image_height_arr*image_resize_width,image_rgb_arr)
+
+
+
+print(original_image_2d_arr)
+
+image_original.show()
