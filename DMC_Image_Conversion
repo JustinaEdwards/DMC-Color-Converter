@@ -1,24 +1,102 @@
+# Imports python library
 from PIL import Image
 from numpy import asarray
+import numpy as np
+from sklearn.cluster import KMeans
+from skimage.io import imsave
+from dmc_rgb_dict import dmc_rgb_dict
 
+# Empty list to hold the closest dmc rgb colors
+dmc_conversion=[]
+
+# Opens the user's original image
 image_original=Image.open("Pictures/Skull_And_Roses.png").convert('RGB')
 
-image_resize_height=100
-image_resize_width=100
+# Sets the dimensions of the image, one pixel is equal to one full stitch
+image_resize_height=200
+image_resize_width=200
 
+# Resizes the image while maintaing the image's aspect ratio
 image_original.thumbnail((image_resize_height,image_resize_width))
 
-#Converts original image into NumPy array; array format(h,h,(rgb))
+# Converts original image into NumPy array; array format(h,w,(rgb))
 original_pixel_array=asarray(image_original)
 
-#Extract the image height, width, and RGB values into variables
+# Extract the image height, width, and RGB values from the original image into individual variables
 image_height_arr,image_width_arr,image_rgb_arr=original_pixel_array.shape
 
-#Formats the NumPy array into a 2D array in order to reduce the number of colors in the image
-original_image_2d_arr=original_pixel_array.reshape(image_height_arr*image_resize_width,image_rgb_arr)
+# Formats the NumPy array into a 2D array to use KMeans algorithm by formatting into (h*w,rgb)
+# This format represent the image's pixels in an array
+original_image_2d_arr=original_pixel_array.reshape(image_height_arr*image_width_arr,image_rgb_arr)
 
+# Uses KMeans algorithm to randomly assign n_clusters to the image, this reduces
+# the number of colors in the image by finding the cluster's center's and 
+# assigning the surronding pixels to the centered clusters
+kmeans=KMeans(n_clusters=20,random_state=0,n_init="auto").fit(original_image_2d_arr)
 
+# Assigns a cluster label to each pixel in the image and assigns the pixel to a cluster
+cluster_labels=kmeans.predict(original_image_2d_arr)
 
-print(original_image_2d_arr)
+# returns a total of n_cluster rgb values in a 2D array
+centered_cluster=np.array(kmeans.cluster_centers_).astype(int)
 
-image_original.show()
+# Copies the original image into the new variable reduced_color_image
+reduced_color_image=np.copy(original_image_2d_arr)
+
+# Takes the original images and iterates through every pixel of the image
+# and assigns the pixel to the cluster group the pixel belongs to
+for pixel in range(len(reduced_color_image)):
+    
+    # Changes the color of the pixel
+    reduced_color_image[pixel]=centered_cluster[cluster_labels[pixel]]
+
+# Reshapes the NumPy array back to (h,w,rgb)
+reduced_color_image=reduced_color_image.reshape(image_height_arr,image_width_arr,image_rgb_arr)
+
+# Iterates through all of the unique colors left in the image after the number of colors was reduced
+for color in centered_cluster:
+    #Sets the min_distance to infinity every time the code exits the inner for loop
+    min_distance=float("inf")
+    
+    # Extract the red, green, and blue RGB values from the centered_cluster array
+    red_reduced, green_reduced, blue_reduced = color
+    
+    # Iterates through a dictionary called dmc_rgb_dict to compare the unique
+    # pixels left in the image to dmc rgb values
+    for dmc_color in dmc_rgb_dict.values():
+        
+        # Extract the red, green, and blue RGB values from the dictionary
+        red_dmc,green_dmc,blue_dmc = dmc_color['rgb']
+        
+        # Calculates the distance between the unique pixel and the dmc rgb value
+        distance=((red_reduced-red_dmc)**2+(green_reduced-green_dmc)**2+(blue_reduced-blue_dmc)**2)**0.5
+        
+        # checks if the distance is less than the min_distance
+        if distance<min_distance:
+            
+            # if the distance is less than the min_distance then set the min_distance to the distance
+            min_distance=distance
+            
+            #Sets dmc_closest to the dmc rgb values
+            dmc_closest=(red_dmc,green_dmc,blue_dmc)
+    
+    # Appends the dmc rgb minimum value to a list
+    dmc_conversion.append(dmc_closest)
+
+# Converts the list into a NumPy array
+dmc_array=np.array(dmc_conversion)
+
+# Copies the original image into the variable dmc_image
+dmc_image=np.copy(original_image_2d_arr)
+
+# Takes the original images and iterates through every pixel of the image
+# and assigns the dmc rgb colors to the cluster group the pixel belongs to
+for pixel in range(len(dmc_image)):
+    # Changes the color of the pixel to dmc rgb values
+    dmc_image[pixel]=dmc_array[cluster_labels[pixel]]
+
+# Reshapes the NumPy array into (h,w,rgb)
+dmc_image=dmc_image.reshape(image_height_arr,image_width_arr,image_rgb_arr)
+
+# Saves the image        
+imsave('Pictures/DMC_Conversion.png',dmc_image)
